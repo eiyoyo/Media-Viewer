@@ -3,10 +3,13 @@
     <header>Medio Viewer</header>
     <div class="display-area">
       <div class="show-time">
+        <div class="color-box"></div>
         <!-- 媒体列表 -->
         <div class="media-list">
           <img v-for="(item,index) in MediaData" :key="index" :src="item" alt="img" @click="showViewer(index)">
         </div>
+        <div class="color-box"></div>
+        <div class="color-box"></div>
         <!-- 媒体查看组件 -->
         <media-viewer
           v-model="viewerVisible"
@@ -48,7 +51,8 @@ export default {
       'http://images.ehaofang.com/1901242009-5c55fa1a-e494-4ff2-8a74-01441e796c0a.jpg',
       'http://images.ehaofang.com/1901242009-fe7ebe9d-9277-48c5-9729-b7fb6c217568.jpg',
       'http://images.ehaofang.com/1901242009-d526ecf3-5e94-4bc7-99df-33c5d253d7d1.jpg',
-      'http://images.ehaofang.com/1901242009-8b07535b-6860-42d8-a660-a5120d97c16a.jpg'
+      'http://images.ehaofang.com/1901242009-8b07535b-6860-42d8-a660-a5120d97c16a.jpg',
+      require('../assets/images/pic.jpg')
     ]
   },
   methods: {
@@ -63,12 +67,15 @@ export default {
 
 <style scoped>
   header {
+    position: fixed;
+    top: 0;
     width: 100%;
     height: 46px;
     line-height: 46px;
     font-size: 18px;
     font-weight: 700;
     text-align: center;
+    background-color: #fff;
     box-shadow: 0 5px 5px #f3f3f3;
   }
   /* 媒体列表 */
@@ -85,8 +92,9 @@ export default {
   }
   .display-area {
     height: calc(100vh - 46px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  }
+  .color-box {
+    width: 100%;
+    height: 400px;
   }
 </style>
