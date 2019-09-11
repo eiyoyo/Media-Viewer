@@ -171,35 +171,10 @@ export default {
       }, { passive: true })
 
       Views.addEventListener('click', (e) => {
-        clearTimeout(this.clickTimer)
-        // 双击事件
-        if ((new Date()).getTime() - this.Timer < 300) {
-          let { clientX: fx, clientY: fy } = this.clickFirstPosition
-          let { clientX: sx, clientY: sy } = e
-          let dbclick = (Math.abs(fx - sx) < 10) && (Math.abs(fy - sy) < 10)
-          if (dbclick) {
-            let hasMagnify = Views.style.transform !== '' && Views.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[1] !== '1'
-            if (hasMagnify) {
-              Views.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
-              Views.style.transitionProperty = 'all'
-              Views.style.transitionDuration = '350ms'
-            } else {
-              Views.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
-              Views.style.transitionProperty = 'all'
-              Views.style.transitionDuration = '350ms'
-              this.enlargePicHandle(Views)
-            }
-          }
-        } else { // 单击事件
-          this.Timer = (new Date()).getTime()
-          this.clickFirstPosition = e
-          this.clickTimer = setTimeout(() => {
-            this.closeViewer(Views)
-          }, 300)
-        }
+        this.singleTouchOnClick(Views, e)
       }, { passive: false })
     },
-    // 执行函数
+    // 各监听事件的执行函数
     singleTouchAtStart (Views, e) {
       // 单指操作
       this.isSingleTouch = true
@@ -287,7 +262,35 @@ export default {
         this.iscloseingDown = false
       }
     },
-    // ----功能函数
+    singleTouchOnClick (Views, e) {
+      clearTimeout(this.clickTimer)
+      // 双击事件
+      if ((new Date()).getTime() - this.Timer < 300) {
+        let { clientX: fx, clientY: fy } = this.clickFirstPosition
+        let { clientX: sx, clientY: sy } = e
+        let dbclick = (Math.abs(fx - sx) < 10) && (Math.abs(fy - sy) < 10)
+        if (dbclick) {
+          let hasMagnify = Views.style.transform !== '' && Views.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[1] !== '1'
+          if (hasMagnify) {
+            Views.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
+            Views.style.transitionProperty = 'all'
+            Views.style.transitionDuration = '350ms'
+          } else {
+            Views.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
+            Views.style.transitionProperty = 'all'
+            Views.style.transitionDuration = '350ms'
+            this.enlargePicHandle(Views)
+          }
+        }
+      } else { // 单击事件
+        this.Timer = (new Date()).getTime()
+        this.clickFirstPosition = e
+        this.clickTimer = setTimeout(() => {
+          this.closeViewer(Views)
+        }, 300)
+      }
+    },
+    // ++++++++++++++++ 功能函数 ++++++++++++++++
     // 单指下滑关闭MEDIAVIEWER功能
     downSlideToClose (node) {
       // 手指横向移动的距离
@@ -339,7 +342,7 @@ export default {
       let Ydisplacement = Math.abs(needMoveY) < canMoveY ? -needMoveY : Ydirection * canMoveY
       Views.style.transform = `translate3d(${Xdisplacement}px, ${Ydisplacement}px, 0px) scale(${scale})`
     },
-    // 单击关闭MEDIAVIEWER
+    // 单击关闭MEDIAVIEWER功能
     closeViewer (Views) {
       // 设置初始的宽度、高度，这样才能产生transition动效
       let scale = Views.style.transform === '' ? 1 : Views.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[1]
