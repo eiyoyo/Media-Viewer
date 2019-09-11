@@ -17,7 +17,6 @@
 </template>
 
 <script>
-// import { setTimeout, clearTimeout } from 'timers'
 export default {
   props: {
     value: {
@@ -46,7 +45,7 @@ export default {
       // 主要的控制条件
       iscloseingDown: false, // 是否在下滑关闭的过程中，此时不允许放大图片和换页操作
       isSingleTouch: true, // 是否是单个手指操作
-      pageTurning: false, // 是否正在切换页面
+      isTurnPageing: false,
       isNormalSized: true, // 图片是否被放大  如果被放大了，单指滑动则不能直接切换页面，反之可以，只在双指缩放功能中可修改
       Timer: 0,
       // 记录滑动的起始和移动中的位置的clientX
@@ -96,7 +95,7 @@ export default {
     // 是否允许下滑关闭MEDIAVIEWER
     canSwipeDownToClose () {
       // 单个手指 || 已经在下滑过程中
-      let controlCondition = this.isSingleTouch && this.iscloseingDown
+      let controlCondition = this.isSingleTouch && !this.isTurnPageing
       return controlCondition
     }
   },
@@ -113,7 +112,6 @@ export default {
     // 动态计算左右滑动的距离
     slidingLength (newValue, oldValue) {
       if (this.isSingleTouch && !this.iscloseingDown) { // 左右滑动翻页的条件： 单指 且 图片未放大 且 不是在下滑关闭的过程中
-        this.pageTurning = true
         let temporaryDisplacement = this.computeLength(this.displacement + newValue)
         this.temporaryDisplacement = temporaryDisplacement
         this.$refs.medioList.style.transform = `translate3d(${-temporaryDisplacement}px, 0px, 0px) scale(1)`
@@ -159,11 +157,15 @@ export default {
     // MEDIAVIEWER注册监听事件
     addLitenerForSlideshow (Views) {
       Views.addEventListener('touchstart', (e) => {
-        this.singleTouchAtStart(Views, e)
+        if (e.touches.length === 1) { // 单指操作
+          this.singleTouchAtStart(Views, e)
+        }
       }, { passive: true })
 
       Views.addEventListener('touchmove', (e) => {
-        this.singleTouchAtMoving(Views, e)
+        if (e.touches.length === 1) { // 单指操作
+          this.singleTouchAtMoving(Views, e)
+        }
       }, { passive: true })
 
       Views.addEventListener('touchend', (e) => {
@@ -174,6 +176,7 @@ export default {
         this.singleTouchOnClick(Views, e)
       }, { passive: false })
     },
+
     // 各监听事件的执行函数
     singleTouchAtStart (Views, e) {
       // 单指操作
@@ -191,8 +194,7 @@ export default {
       this.StartCoordinatesX = e.touches[0].clientX
 
       if (this.canPaging) {
-        // 正在切换页面
-        this.pageTurning = true
+        // 记录时间节点
         this.StartCoordinatesTime = (new Date()).getTime()
       }
     },
@@ -207,24 +209,26 @@ export default {
       let canTurnPage = this.canPaging && (direction === 'left' || direction === 'right')
       if (canTurnPage) {
         this.MovingCoordinatesX = e.touches[0].clientX
+        this.isTurnPageing = true
       }
       // 能否下滑关闭Viewer，向下滑动则关闭Viewer
-      let canDownToClose = this.canSwipeDownToClose || direction === 'down'
+      let canDownToClose = (this.canSwipeDownToClose && direction === 'down') || this.iscloseingDown
       if (canDownToClose) {
         this.downSlideToClose(Views)
         this.iscloseingDown = true
       }
     },
     singleTouchAtEnd (Views, e) {
-      // 当触发的是click事件时
+      // 当触发的是click事件时,结束end事件
       if (!this.noClick) return
       this.noClick = false
       // 滑动时间是否小于300ms
-      let operationTimedOut = ((new Date()).getTime() - this.StartCoordinatesTime) < 300
-      if (this.canPaging) {
+      let operationTimedOut = ((new Date()).getTime() - this.StartCoordinatesTime) > 300
+      if (this.isTurnPageing) {
         // 设置缓动效果，并及时清除
         this.$refs.medioList.style.transitionDuration = '300ms'
         setTimeout(() => {
+          this.isTurnPageing = false
           this.$refs.medioList.style.transitionDuration = '0ms'
         }, 300)
 
@@ -239,7 +243,7 @@ export default {
           // 滑动的距离
           let slideLength = this.displacement - this.temporaryDisplacement
           // 如果单指滑动的距离大于屏幕的一半 或 滑动的时间小于300ms，则换页
-          if (Math.abs(slideLength) > (this.clientWidth / 2) || operationTimedOut) {
+          if (Math.abs(slideLength) > (this.clientWidth / 2) || !operationTimedOut) {
             // 切换到下一节点
             let direction = slideLength > 0 ? 1 : -1 // 滑动方向
             let endLength = this.displacement - ((this.clientWidth + 20) * direction) // 下一节点停留的位置
@@ -252,7 +256,7 @@ export default {
       }
       if (this.iscloseingDown) { // 如果图片是在下滑时关闭的过程中时
         // 如果下滑的时间超过1000ms,则会弹至初始位置，反之则关闭组件
-        if (this.operationTimedOut) { // 回弹至初始位置
+        if (operationTimedOut) { // 回弹至初始位置
           Views.style.transitionDuration = '300ms'
           Views.style.transform = 'translate3d(0px,0px,0px) scale(1)'
           this.rootNode.style.backgroundColor = `rgba(0, 0, 0, 1)`
@@ -290,9 +294,9 @@ export default {
         }, 300)
       }
     },
-    // ++++++++++++++++ 功能函数 ++++++++++++++++
-    // 单指下滑关闭MEDIAVIEWER功能
-    downSlideToClose (node) {
+
+    // ++++++++++++++++  功能函数  ++++++++++++++++
+    downSlideToClose (Views) { // 单指下滑关闭MEDIAVIEWER功能
       // 手指横向移动的距离
       let Xmoving = this.MovingCoordinates.clientX - this.StartCoordinates.clientX
       // 手指纵向移动的距离
@@ -308,20 +312,19 @@ export default {
       if (zoomOutRatio > 0.3) { // 最大缩小到0.3
         if (zoomOutRatio > 0.97) { // 去误差
           zoomOutRatio = 1
-          node.style.transform = `translate3d(${Xmoving}px,${Ymoving}px,0px) scale(1)`
+          Views.style.transform = `translate3d(${Xmoving}px,${Ymoving}px,0px) scale(1)`
         } else {
-          node.style.transform = `translate3d(${Xmoving + Xoffset}px,${Ymoving - Yoffset}px,0px) scale(${zoomOutRatio})`
+          Views.style.transform = `translate3d(${Xmoving + Xoffset}px,${Ymoving - Yoffset}px,0px) scale(${zoomOutRatio})`
         }
         this.rootNode.style.backgroundColor = `rgba(0, 0, 0, ${Math.round(zoomOutRatio * 100) / 100})`
       } else {
         // 重新计算缩放量
         Xoffset = Math.abs(this.MovingCoordinates.clientX - nodeWidth / 2) * 0.7
         Yoffset = Math.abs(this.MovingCoordinates.clientY - nodeHeight / 2) * 0.7
-        node.style.transform = `translate3d(${Xmoving - Xoffset}px,${Ymoving - Yoffset}px,0px) scale(0.3)`
+        Views.style.transform = `translate3d(${Xmoving - Xoffset}px,${Ymoving - Yoffset}px,0px) scale(0.3)`
       }
     },
-    // 双击放大图片功能
-    enlargePicHandle (Views) {
+    enlargePicHandle (Views) { // 双击放大图片功能
       // 获取View说的子节点（img）的宽高，计算放大2倍后的高度和宽度,如果放大后的高度小于可视窗口的高度，则，重新计算放大倍数
       let oldImg = Views.children[0]
       let scale = 0
@@ -342,8 +345,7 @@ export default {
       let Ydisplacement = Math.abs(needMoveY) < canMoveY ? -needMoveY : Ydirection * canMoveY
       Views.style.transform = `translate3d(${Xdisplacement}px, ${Ydisplacement}px, 0px) scale(${scale})`
     },
-    // 单击关闭MEDIAVIEWER功能
-    closeViewer (Views) {
+    closeViewer (Views) { // 单击关闭MEDIAVIEWER功能
       // 设置初始的宽度、高度，这样才能产生transition动效
       let scale = Views.style.transform === '' ? 1 : Views.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[1]
       Views.children[0].style.width = (Views.children[0].innerWidth || Views.children[0].offsetWidth || Views.children[0].clientWidth) * scale + 'px'
@@ -365,7 +367,8 @@ export default {
         this.$emit('input', false)
       }, 350)
     },
-    // 辅助方法
+
+    // ++++++++++++++++  辅助方法  ++++++++++++++++
     getDirection (start, end) { // 判断滑动方向
       let x = start.clientX - end.clientX
       let y = start.clientY - end.clientY
@@ -419,15 +422,6 @@ export default {
 }
 </script>
 <style scoped>
-/* 媒体列表 */
-.media-list img {
-  width: 30%;
-  height: 70px;
-  border-radius: 2%;
-}
-.media-list img:not(:nth-child(3n)) {
-  margin-right: 5%;
-}
 /* MEDIAVIEWER */
 .viewer__model {
   position: fixed;
